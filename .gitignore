@@ -124,3 +124,6 @@ gradle-app.setting
 
 # Secrets
 gradle.properties
+
+# Generated
+local.properties
