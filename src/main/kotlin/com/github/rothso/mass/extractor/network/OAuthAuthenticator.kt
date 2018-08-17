@@ -32,7 +32,7 @@ class OAuthAuthenticator(
     return with(chain.request()) {
       accessToken?.let {
         chain.proceed(this.newBuilder()
-            .addHeader("Authorization", it)
+            .addHeader("Authorization", "Bearer $it")
             .build())
       }
 
