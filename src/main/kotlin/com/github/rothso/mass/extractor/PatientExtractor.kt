@@ -5,27 +5,25 @@ import com.github.rothso.mass.extractor.network.NetworkProvider
 class PatientExtractor {
   private val athena = NetworkProvider.createAthenaClient()
 
-  fun quickstart() {
-    athena.getPracticeInfo(1) // get all available practices
-        .flattenAsObservable { it.practiceInfos }
-        .map { it.practiceId } // we only care about the ID
-        .firstOrError() // get the first practice ID
-        .flatMap { practiceId ->
-          athena.getDepartments(practiceId) // query all departments
-              .flattenAsObservable { it.departments }
-              .map { dept -> Pair(practiceId, dept.departmentId) }
-              .elementAtOrError(4) // pick an arbitrary department
-        }
-        .flatMap { (practiceId, departmentId) ->
-          // Add a new patient to the chosen department
-          athena.createPatient(practiceId, mapOf(
-              "departmentid" to departmentId.toString(),
-              "dob" to "09/10/1999",
-              "firstname" to "David",
-              "lastname" to "Smith",
-              "mobilephone" to "(906) 214-1313"
-          ))
-        } // On success, print the new patient ID
+  fun getSummaries() {
+    val departmentId = getDepartmentId()
+
+    athena.getAllPatients(departmentId) // (1) get all patients
+        .flattenAsObservable { it.patients }
+        .flatMapSingle { athena.getPatientEncounters(it.patientid, departmentId) } // (2) get patient encounters
+        .flatMapIterable { it.encounters }
+        .firstOrError()
+        .flatMap { athena.getEncounterSummary(it.encounterId) } // (3) get HTML summary
+        .map { it.html }
         .subscribe(::println, Throwable::printStackTrace)
+
+    // TODO feed into faker, save to .html and .pdf (open .html in Word to convert to PDF)
+  }
+
+  private fun getDepartmentId(): Int {
+    return athena.getDepartments() // query all departments
+        .flattenAsObservable { it.departments }
+        .map { it.departmentId }
+        .blockingFirst() // pick the first department
   }
 }

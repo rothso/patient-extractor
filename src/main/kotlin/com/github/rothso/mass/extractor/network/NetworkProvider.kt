@@ -12,8 +12,10 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import java.util.concurrent.TimeUnit
 
 object NetworkProvider {
-  private const val BASE_URL = "https://api.athenahealth.com/preview1/"
+  private const val BASE_URL = "https://api.athenahealth.com/preview1/195900/" // TODO practiceId in BuildConfig
   private const val BASE_URL_OAUTH = "https://api.athenahealth.com/oauthpreview/"
+//  private const val BASE_URL = "https://api.athenahealth.com/v1/195900/"
+//  private const val BASE_URL_OAUTH = "https://api.athenahealth.com/oauth/195900/"
   private val retrofit: Retrofit
 
   init {
@@ -40,6 +42,7 @@ object NetworkProvider {
             .authenticator(authenticator)
             .addInterceptor(authenticator)
             .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .build())
         .build()
   }
