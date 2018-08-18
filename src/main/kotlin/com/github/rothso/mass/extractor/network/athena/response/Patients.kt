@@ -1,7 +1,9 @@
 package com.github.rothso.mass.extractor.network.athena.response
 
-data class PatientsResponse(
+import com.squareup.moshi.Json
+
+data class Patients(
     val next: String, // paginated
     val patients: List<Patient>,
-    val totalcount: Int
+    @Json(name = "totalcount") val totalCount: Int
 )

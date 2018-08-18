@@ -1,5 +1,6 @@
 package com.github.rothso.mass.extractor.network.athena
 
+import com.github.rothso.mass.extractor.network.OAuthAuthenticator
 import com.github.rothso.mass.extractor.network.athena.response.TokenResponse
 import io.reactivex.Observable
 import retrofit2.http.Field
@@ -7,6 +8,10 @@ import retrofit2.http.FormUrlEncoded
 import retrofit2.http.Header
 import retrofit2.http.POST
 
+/**
+ * @see AthenaService
+ * @see OAuthAuthenticator
+ */
 interface OAuthService {
 
   @FormUrlEncoded
