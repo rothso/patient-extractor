@@ -5,6 +5,7 @@ import com.github.rothso.mass.extractor.network.athena.AthenaService
 import com.github.rothso.mass.extractor.network.athena.OAuthService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import io.reactivex.schedulers.Schedulers
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
@@ -19,7 +20,7 @@ object NetworkProvider {
   private val retrofit: Retrofit
 
   init {
-    val rxJavaAdapterFactory = RxJava2CallAdapterFactory.create() // TODO scheduling
+    val rxJavaAdapterFactory = RxJava2CallAdapterFactory.createWithScheduler(Schedulers.io())
     val moshiConverterFactory = MoshiConverterFactory.create(Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build())

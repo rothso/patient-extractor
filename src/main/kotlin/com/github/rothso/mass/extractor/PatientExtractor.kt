@@ -1,8 +1,6 @@
 package com.github.rothso.mass.extractor
 
 import com.github.rothso.mass.extractor.network.NetworkProvider
-import com.github.rothso.mass.extractor.network.athena.response.Summary
-import io.reactivex.Observable
 
 class PatientExtractor {
   private val athena = NetworkProvider.createAthenaClient()
@@ -13,21 +11,28 @@ class PatientExtractor {
    *  2. Get every encounterid for each patient
    *  3. Get the HTML summary for every encounter
    */
-  fun getSummaries(): Observable<Summary> {
-    // TODO: throttle requests
-    return athena.getAllPatients() // (1)
-        .flattenAsObservable { it.patients }
-        .flatMapSingle { athena.getPatientEncounters(it.patientid) } // (2)
-        .flatMapIterable { it.encounters }
-        .firstOrError() // temporary, until throttling is added
-        .flatMap { athena.getEncounterSummary(it.encounterId) } // (3)
-        .toObservable()
-  }
+  fun redactSummaries() {
+    athena.getAllPatients() // (1)
+        .flattenAsFlowable { it.patients }
+        .map { it.patientid }
+        .distinct()
+        .doOnNext { println(it) }
+        .onBackpressureBuffer()
+        .flatMap({ patientid ->
+          athena.getPatientEncounters(patientid) // (2)
+              .doOnSubscribe { println("Requesting patient encounters for $patientid") }
+              .doOnSuccess { println("Got encounters") }
+              .flattenAsFlowable { it.encounters }
+              .onBackpressureBuffer()
+              .flatMapSingle({ encounter ->
+                athena.getEncounterSummary(encounter.encounterId) // (3)
+                    .doOnSubscribe { println("Requesting summaries for $patientid") }
+                    .doOnSuccess { println("Got summary") }
+              }, false, 1)
+              .doOnComplete { println("Finished $patientid") }
+        }, false, 3)
+        .blockingSubscribe({}, Throwable::printStackTrace)
 
-  fun redactSummaries(summaries: Observable<Summary>) {
-    summaries
-        .map { it.html }
-        .subscribe(::println, Throwable::printStackTrace)
     // TODO Faker search/replace; save to .html; open .html in Word to convert to .pdf
   }
 }

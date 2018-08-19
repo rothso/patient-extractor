@@ -2,5 +2,5 @@ package com.github.rothso.mass.extractor
 
 fun main(args: Array<String>) {
   val extractor = PatientExtractor()
-  extractor.redactSummaries(extractor.getSummaries())
+  extractor.redactSummaries()
 }
