@@ -3,9 +3,12 @@ package com.github.rothso.mass.extractor
 import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.github.rothso.mass.extractor.network.athena.response.Patient
 import io.reactivex.schedulers.Schedulers
+import java.io.File
+import java.io.PrintWriter
 
 class PatientExtractor {
   private val athena = NetworkProvider.createAthenaClient()
+  private val patientFaker = PatientFaker()
 
   /**
    * Get the HTML summaries for redaction and storage. This requires three API calls:
@@ -21,35 +24,38 @@ class PatientExtractor {
         .flatMap({ patient ->
           val id = patient.patientid
           athena.getPatientEncounters(id) // (2)
-              .doOnSubscribe { println("Requesting patient encounters for $id") }
-              .doOnSuccess { println("Got encounters") }
               .flattenAsFlowable { it.encounters }
               .onBackpressureBuffer()
               .flatMapSingle({ encounter ->
                 athena.getEncounterSummary(encounter.encounterId) // (3)
-                    .doOnSubscribe { println("Requesting summaries for $id") }
-                    .doOnSuccess { println("Got summary") }
+                    .map { summary -> Pair(encounter.encounterId, summary) }
               }, false, 1)
-              .doOnComplete { println("Finished $id") }
-              .map { Pair(patient, it) }
-        }, false, 3) // TODO may need to tweak maxConcurrency in prod build
+              .map { (encId, summary) -> Triple(patient, encId, summary.html) }
+        }, 3) // TODO may need to tweak maxConcurrency in prod API
         .observeOn(Schedulers.computation())
-        .map { (patient, summary) -> fake(patient, summary.html) }
-        .blockingSubscribe({ html ->
-          saveAsHtml(html)
-          saveAsPdf(html)
-        }, Throwable::printStackTrace)
+        .map { (patient, encId, html) -> Pair(encId, fake(patient, html)) }
+        .blockingSubscribe({ (encId, html) -> saveAsHtml(encId, html) }, Throwable::printStackTrace)
   }
 
   private fun fake(patient: Patient, html: String): String {
-    TODO()
+    val alias = patientFaker.getAlias(patient)
+    val replacements = mapOf(
+        "${patient.firstname} ${patient.lastname}" to "${alias.firstname} ${alias.lastname}",
+        "${patient.lastname}, ${patient.firstname}" to "${alias.lastname}, ${alias.firstname}",
+        patient.dob to alias.dob
+    )
+
+    return replacements.asIterable().fold(html) {
+      str, (old, new) -> str.replace(old, new, true)
+    }
   }
 
-  private fun saveAsHtml(html: String) {
-    TODO()
-  }
+  private fun saveAsHtml(encounterId: Int, html: String) {
+    val file = File("encounters/$encounterId.html").apply {
+      getParentFile().mkdirs()
+    }
 
-  private fun saveAsPdf(html: String) {
-    TODO()
+    PrintWriter(file).use { pw -> pw.print(html) }
+    println("Saved $encounterId")
   }
 }

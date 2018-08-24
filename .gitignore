@@ -127,3 +127,6 @@ gradle.properties
 
 # Generated
 local.properties
+
+# Output
+*.html

@@ -36,6 +36,9 @@ dependencies {
     implementation 'com.squareup.moshi:moshi-kotlin:1.6.0'
     kapt 'com.squareup.moshi:moshi-kotlin-codegen:1.6.0'
 
+    // Faker
+    implementation 'com.github.javafaker:javafaker:0.15'
+
     testImplementation 'junit:junit:4.12'
 }
 
