@@ -4,9 +4,11 @@ import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.github.rothso.mass.extractor.network.athena.response.Encounters
 import com.github.rothso.mass.extractor.network.athena.response.Patients
 import com.github.rothso.mass.extractor.network.athena.response.Summary
+import io.reactivex.Maybe
 import io.reactivex.Single
 import retrofit2.http.GET
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * The AthenaService interface defines the remote API endpoints consumed by the application.
@@ -19,10 +21,10 @@ import retrofit2.http.Path
 interface AthenaService {
 
   @GET("patients?departmentid=1")
-  fun getAllPatients(): Single<Patients>
+  fun getAllPatients(@Query("offset") offset: Int): Single<Patients>
 
   @GET("chart/{pid}/encounters?departmentid=1")
-  fun getPatientEncounters(@Path("pid") patientId: Int): Single<Encounters>
+  fun getPatientEncounters(@Path("pid") patientId: Int): Maybe<Encounters>
 
   @GET("chart/encounters/{eid}/summary")
   fun getEncounterSummary(@Path("eid") encounterId: Int): Single<Summary>
