@@ -8,9 +8,8 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.PrintWriter
 
-class PatientExtractor {
+class PatientExtractor(private val patientFaker: PatientFaker) {
   private val athena = NetworkProvider.createAthenaClient()
-  private val patientFaker = PatientFaker() // TODO: serialize in case of crash
 
   private data class Context(
       val nextPage: String?,

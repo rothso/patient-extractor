@@ -3,11 +3,10 @@ package com.github.rothso.mass.extractor
 import com.github.javafaker.Faker
 import com.github.rothso.mass.extractor.network.athena.response.Patient
 
-class PatientFaker {
-  private val mappings = mutableMapOf<Patient, Patient>()
+class PatientFaker(private val mappings: MutableMap<Int, Patient> = mutableMapOf()) {
 
   fun getAlias(target: Patient): Patient {
-    return mappings.getOrPut(target) {
+    return mappings.getOrPut(target.patientid) {
       val faker = Faker()
       val name = faker.name()
 
