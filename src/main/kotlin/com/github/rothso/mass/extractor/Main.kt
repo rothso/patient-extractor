@@ -1,5 +1,7 @@
 package com.github.rothso.mass.extractor
 
+import com.github.rothso.mass.BuildConfig
+import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okio.Okio
@@ -11,7 +13,13 @@ import java.io.File
 const val FAKER_CACHE = "faker.json"
 
 fun main(args: Array<String>) {
-  // TODO args: practiceId, key, secret, max_concurrency
+  // Required arguments: API key and secret
+  val athenaKey = args.getOrNull(0) ?: BuildConfig.ATHENA_KEY
+  val athenaSecret = args.getOrNull(1) ?: BuildConfig.ATHENA_SECRET
+
+  // Optional values (no practiceId will use the preview endpoint)
+  val practiceId = args.getOrNull(2)?.toInt()
+  val maxConcurrency = if (practiceId == null) 2 else args.getOrNull(3)?.toInt() ?: 10
 
   // Deserialize the PatientFaker and reuse any existing fake associations
   val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
@@ -28,6 +36,7 @@ fun main(args: Array<String>) {
   })
 
   // Run the extractor tool
-  val extractor = PatientExtractor(faker)
+  val athena = NetworkProvider(athenaKey, athenaSecret, practiceId)
+  val extractor = PatientExtractor(athena, faker, maxConcurrency)
   extractor.redactSummaries()
 }

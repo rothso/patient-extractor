@@ -8,8 +8,12 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.PrintWriter
 
-class PatientExtractor(private val patientFaker: PatientFaker) {
-  private val athena = NetworkProvider.createAthenaClient()
+class PatientExtractor(
+    private networkProvider: NetworkProvider,
+    private val patientFaker: PatientFaker,
+    private val maxConcurrency: Int
+) {
+  private val athena = networkProvider.createAthenaClient()
 
   private data class Context(
       val nextPage: String?,
@@ -52,8 +56,8 @@ class PatientExtractor(private val patientFaker: PatientFaker) {
                       println("\t\t[HIT] Encounter")
                       athena.getEncounterSummary(eId) // (3)
                           .map { Context(nextPage, patient, eId, it.html) }
-                    }, false, 3)
-              }, 1) // TODO may need to tweak maxConcurrency in prod API
+                    }, false, maxConcurrency)
+              }, 1)
         }
         .takeUntil { it.nextPage == null } // stop when there are no pages left
         .observeOn(Schedulers.computation())
