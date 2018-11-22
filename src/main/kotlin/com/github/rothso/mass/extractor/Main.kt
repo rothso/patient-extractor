@@ -8,9 +8,6 @@ import okio.Okio
 import java.io.File
 import java.io.PrintWriter
 
-/**
- * File location to serialize/deserialize the [PatientFaker].
- */
 const val FAKER_CACHE = "faker.json"
 const val PAGE_RECORD = "page.json"
 const val OUTPUT_FOLDER = "encounters/"
@@ -51,9 +48,9 @@ fun main(args: Array<String>) {
 
   // Run the extractor tool
   extractor.getSummaries(maxConcurrency, lastPage)
-      .blockingSubscribe({ (encounterId, html) ->
+      .blockingSubscribe({ (encounterId, patient, html) ->
         saveAsHtml(encounterId, html)
-        println("Saved: $encounterId.html")
+        println("\u2713  $encounterId \t ${patient.name}")
       }, Throwable::printStackTrace)
 
   // TODO: Auto restart if it crashes due to a 403

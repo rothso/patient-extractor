@@ -28,7 +28,6 @@ class PatientExtractor(
    */
   fun getSummaries(maxConcurrency: Int, startPage: Int = 0): Flowable<RedactedSummary> {
     return Flowable.range(startPage, Integer.MAX_VALUE - startPage)
-        .doOnNext { println(it) }
         .concatMap { offset ->
           currentPage = offset
           val pageObservable = athena.getAllPatients(offset * 10).cache() // (1)
@@ -56,19 +55,9 @@ class PatientExtractor(
         }
         .takeUntil { it.nextPage == null } // stop when there are no pages left
         .observeOn(Schedulers.computation())
-        .map { (_, patient, eId, html) -> RedactedSummary(eId, fake(patient, html)) }
-  }
-
-  private fun fake(patient: Patient, html: String): String {
-    val alias = patientFaker.getAlias(patient)
-    val replacements = mapOf(
-        "${patient.firstname} ${patient.lastname}" to "${alias.firstname} ${alias.lastname}",
-        "${patient.lastname}, ${patient.firstname}" to "${alias.lastname}, ${alias.firstname}",
-        patient.dob to alias.dob
-    )
-
-    return replacements.asIterable().fold(html) { str, (old, new) ->
-      str.replace(old, new, true)
-    }
+        .map { (_, patient, eId, html) ->
+          val (alias, redacted) = patientFaker.fake(patient, html)
+          RedactedSummary(eId, alias, redacted)
+        }
   }
 }
