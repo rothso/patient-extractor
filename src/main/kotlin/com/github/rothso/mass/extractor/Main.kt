@@ -1,5 +1,6 @@
 package com.github.rothso.mass.extractor
 
+import com.github.ajalt.mordant.TermColors
 import com.github.rothso.mass.BuildConfig
 import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.squareup.moshi.Moshi
@@ -50,7 +51,9 @@ fun main(args: Array<String>) {
   extractor.getSummaries(maxConcurrency, lastPage)
       .blockingSubscribe({ (encounterId, patient, html) ->
         saveAsHtml(encounterId, html)
-        println("\u2713  $encounterId \t ${patient.name}")
+        with (TermColors()) {
+          println(green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name))
+        }
       }, Throwable::printStackTrace)
 
   // TODO: Auto restart if it crashes due to a 403
