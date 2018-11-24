@@ -1,10 +1,13 @@
 package com.github.rothso.mass.extractor
 
+import com.github.ajalt.mordant.TermColors
 import com.github.rothso.mass.extractor.network.athena.AthenaService
 import com.github.rothso.mass.extractor.network.athena.response.Patient
 import io.reactivex.Flowable
 import io.reactivex.schedulers.Schedulers
 import retrofit2.HttpException
+import java.util.concurrent.TimeUnit
+import kotlin.math.max
 
 class PatientExtractor(
     private val athena: AthenaService,
@@ -58,6 +61,15 @@ class PatientExtractor(
         .map { (_, patient, eId, html) ->
           val (alias, redacted) = patientFaker.fake(patient, html)
           RedactedSummary(eId, alias, redacted)
+        }
+        .onErrorResumeNext { t: Throwable ->
+          // Automatically recover from the last page if we crash due to rate-limiting
+          if (t is HttpException && t.code() == 403) {
+            println(TermColors().run { red + bold }("\u2718 Hit API rate limit"))
+            getSummaries(max(2, maxConcurrency - 1), currentPage) // lower the concurrency
+                .delaySubscription(500, TimeUnit.MILLISECONDS)
+                .doOnSubscribe { println("Recovering on page $currentPage.") }
+          } else Flowable.error(t)
         }
   }
 }

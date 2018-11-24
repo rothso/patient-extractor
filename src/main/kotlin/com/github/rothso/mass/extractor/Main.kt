@@ -27,7 +27,7 @@ fun main(args: Array<String>) {
 
   // Optional values (no practiceId = use the preview endpoint)
   val practiceId = args.getOrNull(2)?.toInt()
-  val maxConcurrency = if (practiceId == null) 2 else args.getOrNull(3)?.toInt() ?: 10
+  val maxConcurrency = if (practiceId == null) 3 else args.getOrNull(3)?.toInt() ?: 10
 
   // Create a faker that remembers associations from previous runs
   val faker = when {
@@ -45,18 +45,16 @@ fun main(args: Array<String>) {
   })
 
   // Get the last page we were on
-  val lastPage = if (pageFile.exists()) pageFile.readText().toInt() else 0
+  val lastPage = if (pageFile.exists()) pageFile.readText().trim().toInt() else 0
 
   // Run the extractor tool
   extractor.getSummaries(maxConcurrency, lastPage)
       .blockingSubscribe({ (encounterId, patient, html) ->
         saveAsHtml(encounterId, html)
-        with (TermColors()) {
+        with(TermColors()) {
           println(green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name))
         }
       }, Throwable::printStackTrace)
-
-  // TODO: Auto restart if it crashes due to a 403
 }
 
 private fun saveAsHtml(encounterId: Int, html: String) {
