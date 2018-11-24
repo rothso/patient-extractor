@@ -8,6 +8,7 @@ class PatientFaker(private val mappings: MutableMap<Int, Patient> = mutableMapOf
   fun fake(patient: Patient, text: String): Pair<Patient, String> {
     val alias = getAlias(patient)
     val replacements = mapOf(
+        // Middle names don't appear in the report, so we don't have to worry about replacing them
         "${patient.firstname} ${patient.lastname}" to "${alias.firstname} ${alias.lastname}",
         "${patient.lastname}, ${patient.firstname}" to "${alias.lastname}, ${alias.firstname}",
         patient.dob to alias.dob
@@ -27,7 +28,6 @@ class PatientFaker(private val mappings: MutableMap<Int, Patient> = mutableMapOf
           patientid = target.patientid,
           firstname = name.firstName(),
           lastname = name.lastName(),
-          // TODO handle middle names?
           dob = let {
             // Keep the year; replace month and day
             val date = faker.date().birthday()
