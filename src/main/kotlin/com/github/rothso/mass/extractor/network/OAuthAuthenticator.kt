@@ -14,7 +14,7 @@ class OAuthAuthenticator(
   private val lock = ReentrantLock()
   private var accessToken: String? = null
 
-  override fun authenticate(route: Route, response: Response): Request? {
+  override fun authenticate(route: Route?, response: Response): Request? {
     if (response.request().header("Authorization") != null) {
       return null // Give up, we've already failed to authenticate.
     }
