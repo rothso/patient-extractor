@@ -1,10 +1,10 @@
 package com.github.rothso.mass.extractor
 
 import com.github.ajalt.mordant.TermColors
-import com.github.rothso.mass.BuildConfig
 import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import io.github.cdimascio.dotenv.dotenv
 import okio.Okio
 import java.io.File
 import java.io.PrintWriter
@@ -14,6 +14,9 @@ const val PAGE_RECORD = "page.json"
 const val OUTPUT_FOLDER = "encounters/"
 
 fun main(args: Array<String>) {
+  val dotenv = dotenv()
+  val tc = TermColors()
+
   val mapFile = File(FAKER_CACHE)
   val pageFile = File(PAGE_RECORD)
 
@@ -22,12 +25,12 @@ fun main(args: Array<String>) {
   val adapter = moshi.adapter<PatientFaker>(PatientFaker::class.java).lenient()
 
   // Required arguments: API key and secret
-  val athenaKey = args.getOrNull(0) ?: BuildConfig.ATHENA_KEY
-  val athenaSecret = args.getOrNull(1) ?: BuildConfig.ATHENA_SECRET
+  val athenaKey = dotenv["ATHENA_KEY"] ?: return println(tc.red("Missing ATHENA_KEY in .env"))
+  val athenaSecret = dotenv["ATHENA_SECRET"] ?: return println(tc.red("Missing ATHENA_SECRET in .env"))
 
   // Optional values (no practiceId = use the preview endpoint)
-  val practiceId = args.getOrNull(2)?.toInt()
-  val maxConcurrency = if (practiceId == null) 3 else args.getOrNull(3)?.toInt() ?: 10
+  val practiceId = dotenv["PRACTICE_ID"]?.toInt()
+  val maxConcurrency = if (practiceId == null) 3 else args.getOrNull(0)?.toInt() ?: 10
 
   // Create a faker that remembers associations from previous runs
   val faker = when {
@@ -51,9 +54,7 @@ fun main(args: Array<String>) {
   extractor.getSummaries(maxConcurrency, lastPage)
       .blockingSubscribe({ (encounterId, patient, html) ->
         saveAsHtml(encounterId, html)
-        with(TermColors()) {
-          println(green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name))
-        }
+        println(with(tc) { green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name) })
       }, Throwable::printStackTrace)
 }
 
