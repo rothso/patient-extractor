@@ -53,13 +53,13 @@ fun main(args: Array<String>) {
   // Run the extractor tool
   extractor.getSummaries(maxConcurrency, lastPage)
       .blockingSubscribe({ (encounterId, patient, html) ->
-        saveAsHtml(encounterId, html)
+        saveAsHtml("${patient.lastname}_${patient.firstname}_$encounterId", html)
         println(with(tc) { green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name) })
       }, Throwable::printStackTrace)
 }
 
-private fun saveAsHtml(encounterId: Int, html: String) {
-  val file = File("$OUTPUT_FOLDER$encounterId.html").apply {
+private fun saveAsHtml(name: String, html: String) {
+  val file = File("$OUTPUT_FOLDER$name.html").apply {
     parentFile.mkdirs()
   }
 
