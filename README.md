@@ -8,17 +8,18 @@
 Download the [latest build](https://github.com/rothso/patient-extractor/releases/latest) of the 
 JAR. Then, create a file named `.env` with the following key-value pairs:
 
-```
+```ini
 ATHENA_KEY=your-api-key
 ATHENA_SECRET=your-api-secret
 PRACTICE_ID=clinic-id
 ```
 
-Alternatively, if you're using the practice API, only provide the practice API key/secret and 
+Alternatively, if you're using the Preview API for testing purposes, only provide the Preview API 
+key/secret and 
 leave off the practice ID:
-```
-ATHENA_KEY=practice-api-key
-ATHENA_SECRET=practice-api-secret
+```ini
+ATHENA_KEY=preview-api-key
+ATHENA_SECRET=preview-api-secret
 ```
 
 Run the jar to start the download process:
@@ -27,26 +28,30 @@ Run the jar to start the download process:
 > java -jar patient-extractor.jar
 ```
 
-The redacted HTML summaries are saved in the `encounters` folder.
+You can alternatively download the summaries of only certain patients by specifying their IDs in a 
+file, one per line, and providng the file name as the first argument:
+
+```sh
+> java -jar patient-extractor.jar patient_ids.txt
+```
+
+The redacted HTML summaries are saved in the `encounters` folder, or `encounters-preview` if the 
+program was run in Preview Mode.
 
 ## Features
 
-You can also optionally specify the maximum number of concurrent requests as the first argument 
-(the default is 10 for a real API, 2 for the preview API). The program will automatically reduce 
-this number whenever it gets rate-limited.
-
-```sh
-# Run with maximum 20 concurrent requests
-> java -jar patient-extractor.jar 20
-```
+#### Recovery
 
 If the program crashes or exits, the downloader will resume where it left off the next time you 
-run the program. Two files are used to persist state across runs:
+run the program. Several files are used to persist state across runs. To completely start over, delete 
+the `encounters` folder and these state files:
 
 * `faker.json`: Stores all Faker associations
-* `page.json`: Stores the last-visited page
+* `page.txt`: Stores the last-visited page (if extracting all patients)
+* `patient.txt`: Stores the last-visited patient (if extracting by patient IDs)
 
-To completely start over, delete the `encounters` folder and these two files.
+If the program was run in Preview Mode (using the practice API), these files will be prefixed with
+`preview-` in order to keep them separate from production runs. 
 
 ## Building from source
 You can download and compile this project yourself:
