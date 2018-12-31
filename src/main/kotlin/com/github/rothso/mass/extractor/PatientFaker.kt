@@ -1,9 +1,31 @@
 package com.github.rothso.mass.extractor
 
 import com.github.javafaker.Faker
+import com.github.rothso.mass.extractor.persist.Marshallable
 import com.github.rothso.mass.extractor.network.athena.response.Patient
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import okio.BufferedSink
+import okio.BufferedSource
 
-class PatientFaker(private val mappings: MutableMap<Int, Patient> = mutableMapOf()) {
+class PatientFaker : Marshallable {
+  private var mappings: MutableMap<Int, Patient> = mutableMapOf()
+
+  // Create an adapter for serializing/deserializing the Faker
+  private val adapter = let {
+    val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    val type = Types.newParameterizedType(MutableMap::class.java, Int::class.javaObjectType, Patient::class.java)
+    moshi.adapter<MutableMap<Int, Patient>>(type).lenient()
+  }
+
+  override fun onHydrate(source: BufferedSource) {
+    mappings = adapter.fromJson(source) ?: mappings
+  }
+
+  override fun onHibernate(sink: BufferedSink) {
+    adapter.toJson(sink, mappings)
+  }
 
   fun fake(patient: Patient, text: String): Pair<Patient, String> {
     val alias = getAlias(patient)

@@ -1,60 +1,92 @@
 package com.github.rothso.mass.extractor
 
 import com.github.ajalt.mordant.TermColors
-import com.github.rothso.mass.extractor.network.NetworkProvider
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import com.github.rothso.mass.extractor.persist.Marshaller
 import io.github.cdimascio.dotenv.dotenv
-import okio.Okio
 import java.io.File
 import java.io.PrintWriter
 
-const val FAKER_CACHE = "faker.json"
-const val PAGE_RECORD = "page.json"
+const val FAKER_FILE = "faker.json"
+const val LAST_PAGE_FILE = "page.txt"
+const val LAST_PATIENT_FILE = "patient.txt"
+
+// TODO different output directory for practice & production
 const val OUTPUT_FOLDER = "encounters/"
 
 fun main(args: Array<String>) {
   val dotenv = dotenv()
   val tc = TermColors()
 
-  val mapFile = File(FAKER_CACHE)
-  val pageFile = File(PAGE_RECORD)
-
-  // Create an adapter for serializing/deserializing the Faker
-  val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
-  val adapter = moshi.adapter<PatientFaker>(PatientFaker::class.java).lenient()
-
   // Required arguments: API key and secret
-  val athenaKey = dotenv["ATHENA_KEY"] ?: return println(tc.red("Missing ATHENA_KEY in .env"))
-  val athenaSecret = dotenv["ATHENA_SECRET"] ?: return println(tc.red("Missing ATHENA_SECRET in .env"))
+  val athenaKey = dotenv["ATHENA_KEY"]
+      ?: return println(tc.red("Missing ATHENA_KEY in .env"))
+  val athenaSecret = dotenv["ATHENA_SECRET"]
+      ?: return println(tc.red("Missing ATHENA_SECRET in .env"))
 
   // Optional values (no practiceId = use the preview endpoint)
   val practiceId = dotenv["PRACTICE_ID"]?.toInt()
-  val maxConcurrency = if (practiceId == null) 3 else args.getOrNull(0)?.toInt() ?: 10
+  val maxConcurrency = if (practiceId == null) 5 else 10
 
-  // Create a faker that remembers associations from previous runs
-  val faker = when {
-    mapFile.exists() -> adapter.fromJson(Okio.buffer(Okio.source(mapFile))) ?: PatientFaker()
-    else -> PatientFaker()
+  with(tc) {
+    if (practiceId == null) {
+      println((yellow + bold)("\n\t\u26A0 Using practice API"))
+      println(yellow("\t  Specify the PRACTICE_ID in .env file to use the production API\n"))
+    } else {
+      println((green + bold)("\n\t\u2713 Using production API"))
+      println(green("\t  Practice ID: ${bold(practiceId.toString())}\n"))
+    }
   }
 
-  val athena = NetworkProvider(athenaKey, athenaSecret, practiceId).createAthenaClient()
-  val extractor = PatientExtractor(athena, faker)
+  // Create the faker
+  val faker = PatientFaker()
+
+  // Create the extractor
+  val factory = PatientExtractor.Factory(athenaKey, athenaSecret, practiceId, maxConcurrency, faker)
+  val extractor: PatientExtractor
+  val extractorSaveFile: String
+
+  val inputFileName = args.getOrNull(0)
+  if (inputFileName != null) {
+    // We are downloading summaries based on patient IDs
+    println(tc.green("Downloading summaries for patient IDs listed in ${tc.bold(inputFileName)}"))
+    val file = File(args[0])
+    if (!file.exists())
+      return println(tc.run { red + bold }("Input file does not exist: ${file.absolutePath}"))
+    val patientIds = File(args[0]).readLines().map {
+      it.toIntOrNull() ?: return@main println(tc.red("Parser error: $it is not a number"))
+    }
+    extractor = factory.createByPatientIdExtractor(patientIds)
+    extractorSaveFile = LAST_PATIENT_FILE
+  } else {
+    // We are downloading all patient summaries
+    println(tc.green("Downloading summaries for all patients"))
+    extractor = factory.createAllPatientsExtractor()
+    extractorSaveFile = LAST_PAGE_FILE
+  }
+
+  // Restore any state from previous runs
+  Marshaller.unmarshall(faker, FAKER_FILE)
+  Marshaller.unmarshall(extractor, extractorSaveFile)
 
   // Save state before exiting in case the program crashed and needs to be restarted
   Runtime.getRuntime().addShutdownHook(Thread {
-    Okio.buffer(Okio.sink(mapFile)).use { adapter.toJson(it, faker) }
-    Okio.buffer(Okio.sink(pageFile)).use { it.writeUtf8(extractor.currentPage.toString()) }
+    println("\nCleaning up...")
+    Marshaller.marshall(faker, FAKER_FILE)
+    Marshaller.marshall(extractor, extractorSaveFile)
+    println("Summaries are located at ${tc.green(File(OUTPUT_FOLDER).absolutePath)}")
   })
 
-  // Get the last page we were on
-  val lastPage = if (pageFile.exists()) pageFile.readText().trim().toInt() else 0
-
   // Run the extractor tool
-  extractor.getSummaries(maxConcurrency, lastPage)
-      .blockingSubscribe({ (encounterId, patient, html) ->
-        saveAsHtml("${patient.lastname}_${patient.firstname}_$encounterId", html)
-        println(with(tc) { green("\u2713") + String.format("  %-10d", encounterId) + bold(patient.name) })
+  extractor.getSummaries()
+      .blockingSubscribe({ (eId, patient, html) ->
+        // Save each file under an easy-to-identify name
+        val paddedId = String.format("%04d", patient.patientid)
+        val fileName = paddedId + "_${patient.lastname}_${patient.firstname}_$eId"
+        saveAsHtml(fileName, html)
+
+        // Print a message so we know the request succeeded
+        val msg = String.format("  %-10d", eId) + tc.bold(patient.name) + " (${patient.patientid})"
+        println(tc.green("\u2713") + msg)
       }, Throwable::printStackTrace)
 }
 

@@ -2,6 +2,7 @@ package com.github.rothso.mass.extractor.network
 
 import com.github.rothso.mass.extractor.network.athena.AthenaService
 import com.github.rothso.mass.extractor.network.athena.OAuthService
+import com.github.rothso.mass.extractor.network.athena.RetryingAthenaProxy
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import io.reactivex.schedulers.Schedulers
@@ -21,8 +22,8 @@ class NetworkProvider(apiKey: String, apiSecret: String, practiceId: Int? = null
     private const val PROD_BASE_URL_OAUTH = "https://api.athenahealth.com/oauth/"
   }
 
-  fun createAthenaClient(): AthenaService {
-    return retrofit.create(AthenaService::class.java)
+  fun createAthenaClient(onRetry: () -> Unit = {}): AthenaService {
+    return RetryingAthenaProxy(retrofit.create(AthenaService::class.java), onRetry)
   }
 
   init {

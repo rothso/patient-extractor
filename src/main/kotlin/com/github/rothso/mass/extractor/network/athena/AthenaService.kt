@@ -2,6 +2,7 @@ package com.github.rothso.mass.extractor.network.athena
 
 import com.github.rothso.mass.extractor.network.NetworkProvider
 import com.github.rothso.mass.extractor.network.athena.response.Encounters
+import com.github.rothso.mass.extractor.network.athena.response.Patient
 import com.github.rothso.mass.extractor.network.athena.response.Patients
 import com.github.rothso.mass.extractor.network.athena.response.Summary
 import io.reactivex.Maybe
@@ -22,6 +23,9 @@ interface AthenaService {
 
   @GET("patients?departmentid=1")
   fun getAllPatients(@Query("offset") offset: Int): Single<Patients>
+
+  @GET("patients/{pid}")
+  fun getPatientById(@Path("pid") patientId: Int): Single<List<Patient>>
 
   @GET("chart/{pid}/encounters?departmentid=1")
   fun getPatientEncounters(@Path("pid") patientId: Int): Maybe<Encounters>
