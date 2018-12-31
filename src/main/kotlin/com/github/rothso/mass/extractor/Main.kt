@@ -1,31 +1,51 @@
 package com.github.rothso.mass.extractor
 
 import com.github.ajalt.mordant.TermColors
+import com.github.rothso.mass.extractor.Constants.FAKER_FILE
+import com.github.rothso.mass.extractor.Constants.LAST_PAGE_FILE
+import com.github.rothso.mass.extractor.Constants.LAST_PATIENT_FILE
+import com.github.rothso.mass.extractor.Constants.OUTPUT_FOLDER
 import com.github.rothso.mass.extractor.persist.Marshaller
 import io.github.cdimascio.dotenv.dotenv
 import java.io.File
 import java.io.PrintWriter
 
-const val FAKER_FILE = "faker.json"
-const val LAST_PAGE_FILE = "page.txt"
-const val LAST_PATIENT_FILE = "patient.txt"
+private val dotenv = dotenv()
+private val tc = TermColors()
 
-// TODO different output directory for practice & production
-const val OUTPUT_FOLDER = "encounters/"
+// No practiceId = use the preview Athena endpoint
+private val previewMode = dotenv["PRACTICE_ID"] == null
+
+private object Constants {
+  // Isolate the state between preview and production so the extractor
+  // doesn't resume from the last page or patient id of the wrong mode.
+  val FAKER_FILE = prefix("faker.json")
+  val LAST_PAGE_FILE = prefix("page.txt")
+  val LAST_PATIENT_FILE = prefix("patient.txt")
+
+  // Use different preview and production output locations so preview
+  // summaries don't accidentally get mixed in with production summaries.
+  val OUTPUT_FOLDER = suffix("encounters")
+
+  private fun prefix(name: String): String {
+    return if (previewMode) "preview-$name" else name
+  }
+
+  private fun suffix(name: String): String {
+    return if (previewMode) "$name-preview" else name
+  }
+}
 
 fun main(args: Array<String>) {
-  val dotenv = dotenv()
-  val tc = TermColors()
-
-  // Required arguments: API key and secret
+  // Required arguments: API key and API secret
   val athenaKey = dotenv["ATHENA_KEY"]
       ?: return println(tc.red("Missing ATHENA_KEY in .env"))
   val athenaSecret = dotenv["ATHENA_SECRET"]
       ?: return println(tc.red("Missing ATHENA_SECRET in .env"))
-
-  // Optional values (no practiceId = use the preview endpoint)
   val practiceId = dotenv["PRACTICE_ID"]?.toInt()
-  val maxConcurrency = if (practiceId == null) 5 else 10
+
+  // We want a number as high as possible without triggering rate limiting
+  val maxConcurrency = if (previewMode) 5 else 10
 
   with(tc) {
     if (practiceId == null) {
@@ -58,7 +78,7 @@ fun main(args: Array<String>) {
     extractor = factory.createByPatientIdExtractor(patientIds)
     extractorSaveFile = LAST_PATIENT_FILE
   } else {
-    // We are downloading all patient summaries
+    // No input file, so we are downloading all patient summaries
     println(tc.green("Downloading summaries for all patients"))
     extractor = factory.createAllPatientsExtractor()
     extractorSaveFile = LAST_PAGE_FILE
@@ -82,7 +102,7 @@ fun main(args: Array<String>) {
         // Save each file under an easy-to-identify name
         val paddedId = String.format("%04d", patient.patientid)
         val fileName = paddedId + "_${patient.lastname}_${patient.firstname}_$eId"
-        saveAsHtml(fileName, html)
+        saveAsHtml("$OUTPUT_FOLDER/$fileName.html", html)
 
         // Print a message so we know the request succeeded
         val msg = String.format("  %-10d", eId) + tc.bold(patient.name) + " (${patient.patientid})"
@@ -91,9 +111,7 @@ fun main(args: Array<String>) {
 }
 
 private fun saveAsHtml(name: String, html: String) {
-  val file = File("$OUTPUT_FOLDER$name.html").apply {
-    parentFile.mkdirs()
-  }
-
+  val file = File(name)
+  file.parentFile.mkdirs()
   PrintWriter(file).use { pw -> pw.print(html) }
 }
