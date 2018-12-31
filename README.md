@@ -1,6 +1,7 @@
 # Patient Extractor
-Tool for downloading and redacting patient summaries from Athena.
+> Download and redact patient summaries from Athena.
 
+<p align="center"><img src="extractor.gif?raw=true"/></p>
 
 ## Getting Started
 
