@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 class RetryingAthenaProxy(
     private val athena: AthenaService,
-    private val onRetry: () -> Unit = {}
+    private val onRetry: (Int) -> Unit = {}
 ) : AthenaService {
 
   companion object {
@@ -21,8 +21,8 @@ class RetryingAthenaProxy(
   override fun getAllPatients(offset: Int): Single<Patients> {
     return athena.getAllPatients(offset)
         .onErrorResumeNext { t: Throwable ->
-          if (t is HttpException && t.code() == 403) {
-            onRetry()
+          if (t is HttpException && t.code() in setOf(403, 503)) {
+            onRetry(t.code())
             getAllPatients(offset).delaySubscription(DELAY_MS, TimeUnit.MILLISECONDS)
           } else Single.error(t)
         }
@@ -31,8 +31,8 @@ class RetryingAthenaProxy(
   override fun getPatientById(patientId: Int): Single<List<Patient>> {
     return athena.getPatientById(patientId)
         .onErrorResumeNext { t: Throwable ->
-          if (t is HttpException && t.code() == 403) {
-            onRetry()
+          if (t is HttpException && t.code() in setOf(403, 503)) {
+            onRetry(t.code())
             getPatientById(patientId).delaySubscription(DELAY_MS, TimeUnit.MILLISECONDS)
           } else Single.error(t)
         }
@@ -41,8 +41,8 @@ class RetryingAthenaProxy(
   override fun getPatientEncounters(patientId: Int): Maybe<Encounters> {
     return athena.getPatientEncounters(patientId)
         .onErrorResumeNext { t: Throwable ->
-          if (t is HttpException && t.code() == 403) {
-            onRetry()
+          if (t is HttpException && t.code() in setOf(403, 503)) {
+            onRetry(t.code())
             getPatientEncounters(patientId).delaySubscription(DELAY_MS, TimeUnit.MILLISECONDS)
           } else Maybe.error(t)
         }
@@ -51,8 +51,8 @@ class RetryingAthenaProxy(
   override fun getEncounterSummary(encounterId: Int): Single<Summary> {
     return athena.getEncounterSummary(encounterId)
         .onErrorResumeNext { t: Throwable ->
-          if (t is HttpException && t.code() == 403) {
-            onRetry()
+          if (t is HttpException && t.code() in setOf(403, 503)) {
+            onRetry(t.code())
             getEncounterSummary(encounterId).delaySubscription(DELAY_MS, TimeUnit.MILLISECONDS)
           } else Single.error(t)
         }

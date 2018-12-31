@@ -20,10 +20,12 @@ interface PatientExtractor : Marshallable {
   ) {
     private val networkCtx = NetworkContext(AtomicInteger(maxConcurrency))
     private val athena = NetworkProvider(athenaKey, athenaSecret, practiceId).createAthenaClient {
-      // On retry, log a message so we can see how often we are hitting rate limits
-      println(TermColors().run { red + bold }("\u2718 Hit API rate limit, retrying"))
-      // Automatically lower the concurrency so this doesn't happen as often
-      networkCtx.maxConcurrency.updateAndGet { i -> max(i - 1, 2) }
+      if (it == 403) {
+        // On retry, log a message so we can see how often we are hitting rate limits
+        println(TermColors().run { red + bold }("\u2718 Hit API rate limit, retrying"))
+        // Automatically lower the concurrency so this doesn't happen as often
+        networkCtx.maxConcurrency.updateAndGet { i -> max(i - 1, 2) }
+      }
     }
 
     fun createByPatientIdExtractor(patientIds: List<Int>): PatientExtractor {

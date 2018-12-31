@@ -22,7 +22,7 @@ class NetworkProvider(apiKey: String, apiSecret: String, practiceId: Int? = null
     private const val PROD_BASE_URL_OAUTH = "https://api.athenahealth.com/oauth/"
   }
 
-  fun createAthenaClient(onRetry: () -> Unit = {}): AthenaService {
+  fun createAthenaClient(onRetry: (Int) -> Unit = {}): AthenaService {
     return RetryingAthenaProxy(retrofit.create(AthenaService::class.java), onRetry)
   }
 
