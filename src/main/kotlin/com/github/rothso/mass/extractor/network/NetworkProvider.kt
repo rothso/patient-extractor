@@ -36,7 +36,7 @@ class NetworkProvider(apiKey: String, apiSecret: String, practiceId: Int? = null
 
     val authenticator = let {
       val oAuthService = Retrofit.Builder()
-          .baseUrl(if (debug) DEBUG_URL_OAUTH else "$PROD_BASE_URL_OAUTH$practiceId/")
+          .baseUrl(if (debug) DEBUG_URL_OAUTH else PROD_BASE_URL_OAUTH)
           .addCallAdapterFactory(rxJavaAdapterFactory)
           .addConverterFactory(moshiConverterFactory)
           .build().create(OAuthService::class.java)

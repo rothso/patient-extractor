@@ -23,6 +23,7 @@ class OAuthAuthenticator(
     lock.withLock {
       // Get a token from the OAuth endpoint or implicitly throw an exception
       val tokenResponse = service.login(credentials, "client_credentials").blockingFirst()
+      // TODO: catch http 596 (failed to authenticate) and print the error message
       this.accessToken = tokenResponse.accessToken
     }
 

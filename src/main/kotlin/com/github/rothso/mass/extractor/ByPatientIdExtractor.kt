@@ -24,14 +24,18 @@ internal class ByPatientIdExtractor(
         .skipWhile { startId != null && it != startId }
         .doOnNext { currentId = it }
         .concatMap { id ->
+//          println("$id\t Getting patient by ID")
           athena.getPatientById(id) // (1)
+              // TODO: print an error message on 404 (patient not found)
+//              .doOnSuccess { println("$id\t Got patient by ID") }
               .map { it[0] }
+//              .doOnSuccess { println("$id\t Patient name is ${it.name}") }
               .toFlowable()
               .compose(PatientToSummary())
         }
   }
 
   override fun onHibernate(sink: BufferedSink) {
-    sink.writeUtf8(currentId.toString())
+    sink.writeUtf8(currentId.toString()) // TODO don't write if null
   }
 }

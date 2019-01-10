@@ -10,12 +10,14 @@ import io.github.cdimascio.dotenv.dotenv
 import java.io.File
 import java.io.PrintWriter
 
+// TODO add debug logging
 private val dotenv = dotenv()
 private val tc = TermColors()
 
 // No practiceId = use the preview Athena endpoint
 private val previewMode = dotenv["PRACTICE_ID"] == null
 
+// TODO: create a mode that deletes the save files before running
 private object Constants {
   // Isolate the state between preview and production so the extractor
   // doesn't resume from the last page or patient id of the wrong mode.

@@ -17,11 +17,14 @@ internal abstract class BasePatientExtractor(
 
   protected inner class PatientToSummary : FlowableTransformer<Patient, RedactedSummary> {
 
+    // TODO: log a message if no encounters were found
     override fun apply(upstream: Flowable<Patient>): Publisher<RedactedSummary> {
       return upstream
           .onBackpressureBuffer()
+//          .doOnNext { println("${it.patientid}\t Retrieving patient encounters") }
           .flatMap({ patient ->
             athena.getPatientEncounters(patient.patientid) // (2)
+//                .doOnSuccess { println("${patient.patientid}\t Found ${it.encounters.size} encounters") }
                 .flattenAsFlowable { it.encounters }
                 .onBackpressureBuffer()
                 .onErrorResumeNext { t: Throwable ->
