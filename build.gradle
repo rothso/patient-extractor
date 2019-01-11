@@ -12,6 +12,7 @@ sourceCompatibility = 1.8
 
 repositories {
     maven { url 'http://dl.bintray.com/kotlin/kotlin-eap' }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
     mavenCentral()
 }
 
@@ -32,11 +33,11 @@ dependencies {
     // Faker
     implementation 'com.github.javafaker:javafaker:0.16'
     
-    // Terminal styling
+    // Terminal styling, .env support, logging, CLI arguments parser
     implementation 'com.github.ajalt:mordant:1.2.0'
-
-    // File-based environment variables
-    compile 'io.github.cdimascio:java-dotenv:3.1.7'
+    implementation 'io.github.cdimascio:java-dotenv:3.1.7'
+    implementation 'com.jakewharton.timber:timber-jdk:5.0.0-SNAPSHOT'
+    implementation 'com.github.ajalt:clikt:1.6.0'
 
     testImplementation 'junit:junit:4.12'
 }

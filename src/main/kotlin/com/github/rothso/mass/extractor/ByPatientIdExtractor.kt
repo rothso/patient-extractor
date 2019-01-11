@@ -5,6 +5,8 @@ import com.github.rothso.mass.extractor.network.athena.AthenaService
 import io.reactivex.Flowable
 import okio.BufferedSink
 import okio.BufferedSource
+import timber.log.Timber
+import timber.log.verbose
 
 internal class ByPatientIdExtractor(
     private val athena: AthenaService,
@@ -24,12 +26,12 @@ internal class ByPatientIdExtractor(
         .skipWhile { startId != null && it != startId }
         .doOnNext { currentId = it }
         .concatMap { id ->
-//          println("$id\t Getting patient by ID")
+          Timber.verbose { "$id\t Getting patient by ID" }
           athena.getPatientById(id) // (1)
-              // TODO: print an error message on 404 (patient not found)
-//              .doOnSuccess { println("$id\t Got patient by ID") }
+              // TODO: test a 404 error case (since it's possible to get a 404 response here)
+              // TODO: print an error message on 404 (patient not found) and ensure we recover
               .map { it[0] }
-//              .doOnSuccess { println("$id\t Patient name is ${it.name}") }
+              .doOnSuccess { Timber.verbose { "$id\t Got patient by ID (${it.name})" } }
               .toFlowable()
               .compose(PatientToSummary())
         }

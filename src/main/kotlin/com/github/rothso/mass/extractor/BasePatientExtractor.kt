@@ -8,6 +8,9 @@ import io.reactivex.FlowableTransformer
 import io.reactivex.schedulers.Schedulers
 import org.reactivestreams.Publisher
 import retrofit2.HttpException
+import timber.log.Timber
+import timber.log.verbose
+import timber.log.warn
 
 internal abstract class BasePatientExtractor(
     private val athena: AthenaService,
@@ -17,14 +20,19 @@ internal abstract class BasePatientExtractor(
 
   protected inner class PatientToSummary : FlowableTransformer<Patient, RedactedSummary> {
 
-    // TODO: log a message if no encounters were found
     override fun apply(upstream: Flowable<Patient>): Publisher<RedactedSummary> {
       return upstream
           .onBackpressureBuffer()
-//          .doOnNext { println("${it.patientid}\t Retrieving patient encounters") }
+          .doOnNext { Timber.verbose { "${it.patientid}\t Retrieving patient encounters" } }
           .flatMap({ patient ->
-            athena.getPatientEncounters(patient.patientid) // (2)
-//                .doOnSuccess { println("${patient.patientid}\t Found ${it.encounters.size} encounters") }
+            val patientId = patient.patientid
+            athena.getPatientEncounters(patientId) // (2)
+                .doOnSuccess { res ->
+                  res.encounters.size.let {
+                    if (it > 0) Timber.verbose { "$patientId\t Found $it encounters" }
+                    else Timber.warn { "Found no encounters for $patientId" }
+                  }
+                }
                 .flattenAsFlowable { it.encounters }
                 .onBackpressureBuffer()
                 .onErrorResumeNext { t: Throwable ->
