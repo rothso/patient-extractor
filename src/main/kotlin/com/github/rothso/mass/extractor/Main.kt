@@ -7,132 +7,62 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.TermColors
-import com.github.rothso.mass.extractor.log.ConsoleTree
-import com.github.rothso.mass.extractor.persist.Marshaller
-import io.github.cdimascio.dotenv.dotenv
 import timber.log.Timber
+import timber.log.error
+import timber.log.info
 import java.io.File
-import java.io.PrintWriter
-
-// TODO split main method into Application object
-private val dotenv = dotenv()
-private val tc = TermColors()
-
-// No practiceId = use the preview Athena endpoint
-private val previewMode = dotenv["PRACTICE_ID"] == null
-
-// TODO: create a mode that deletes the save files before running
-private object Constants {
-  // Isolate the state between preview and production so the extractor
-  // doesn't resume from the last page or patient id of the wrong mode.
-  val FAKER_FILE = prefix("faker.json")
-  val LAST_PAGE_FILE = prefix("page.txt")
-  val LAST_PATIENT_FILE = prefix("patient.txt")
-
-  // Use different preview and production output locations so preview
-  // summaries don't accidentally get mixed in with production summaries.
-  val OUTPUT_FOLDER = suffix("encounters")
-
-  private fun prefix(name: String): String {
-    return if (previewMode) "preview-$name" else name
-  }
-
-  private fun suffix(name: String): String {
-    return if (previewMode) "$name-preview" else name
-  }
-}
-
-// https://stackoverflow.com/a/11159435
-private val jarName = File(MainCommand::class.java.protectionDomain.codeSource.location.path).name
-
-class MainCommand : CliktCommand(name = "java -jar $jarName") {
-  // TODO: document args
-  private val file by argument().file(exists = true).optional()
-  private val verbose by option("-v", "--verbose").flag("-s", "--silent", default = false)
-
-  override fun run() {
-    // Enable verbose logs
-    val tree = ConsoleTree(if (verbose) Timber.VERBOSE else Timber.WARNING)
-    Timber.plant(tree)
-
-    // Required arguments: API key and API secret
-    val athenaKey = dotenv["ATHENA_KEY"]
-        ?: return println(tc.red("Missing ATHENA_KEY in .env"))
-    val athenaSecret = dotenv["ATHENA_SECRET"]
-        ?: return println(tc.red("Missing ATHENA_SECRET in .env"))
-    val practiceId = dotenv["PRACTICE_ID"]?.toInt()
-
-    // We want a number as high as possible without triggering rate limiting
-    val maxConcurrency = if (previewMode) 5 else 10
-
-    with(tc) {
-      if (practiceId == null) {
-        println((yellow + bold)("\n\t\u26A0 Using practice API"))
-        println(yellow("\t  Specify the PRACTICE_ID in .env file to use the production API\n"))
-      } else {
-        println((green + bold)("\n\t\u2713 Using production API"))
-        println(green("\t  Practice ID: ${bold(practiceId.toString())}\n"))
-      }
-    }
-
-    // Create the faker
-    val faker = PatientFaker()
-
-    // Create the extractor
-    val factory = PatientExtractor.Factory(athenaKey, athenaSecret, practiceId, maxConcurrency, faker)
-    val extractor: PatientExtractor
-    val extractorSaveFile: String
-
-    // The file property has a custom getter; capture it here so we can use smart casting below
-    val file = file
-
-    if (file != null) {
-      // We are downloading summaries based on patient IDs
-      println(tc.green("Downloading summaries for patient IDs listed in ${tc.bold(file.name)}"))
-
-      val patientIds = file.readLines().map {
-        it.toIntOrNull() ?: return println(tc.red("Parser error: $it is not a number"))
-      }
-      extractor = factory.createByPatientIdExtractor(patientIds)
-      extractorSaveFile = Constants.LAST_PATIENT_FILE
-    } else {
-      // No input file, so we are downloading all patient summaries
-      println(tc.green("Downloading summaries for all patients"))
-      extractor = factory.createAllPatientsExtractor()
-      extractorSaveFile = Constants.LAST_PAGE_FILE
-    }
-
-    // Restore any state from previous runs
-    Marshaller.unmarshall(faker, Constants.FAKER_FILE)
-    Marshaller.unmarshall(extractor, extractorSaveFile)
-
-    // Save state before exiting in case the program crashed and needs to be restarted
-    Runtime.getRuntime().addShutdownHook(Thread {
-      println("\nCleaning up...")
-      Marshaller.marshall(faker, Constants.FAKER_FILE)
-      Marshaller.marshall(extractor, extractorSaveFile)
-      println("Summaries are at: ${tc.green(File(Constants.OUTPUT_FOLDER).absolutePath)}")
-    })
-
-    // Run the extractor tool
-    extractor.getSummaries()
-        .blockingSubscribe({ (eId, patient, html) ->
-          // Save each file under an easy-to-identify name
-          val paddedId = String.format("%04d", patient.patientid)
-          val fileName = paddedId + "_${patient.lastname}_${patient.firstname}_$eId"
-          saveAsHtml("${Constants.OUTPUT_FOLDER}/$fileName.html", html)
-
-          // Print a message so we know the request succeeded
-          val msg = String.format("  %-10d", eId) + tc.bold(patient.name) + " (${patient.patientid})"
-          println(tc.green("\u2713") + msg)
-        }, Throwable::printStackTrace)
-  }
-}
 
 fun main(args: Array<String>) = MainCommand().main(args)
 
-private fun saveAsHtml(name: String, html: String) {
-  val file = File(name)
-  file.parentFile.mkdirs()
-  PrintWriter(file).use { pw -> pw.print(html) }
+class MainCommand : CliktCommand(name = "java -jar ${getJarName()}") {
+  private val file by argument().file(exists = true).optional() // TODO: document args
+  private val verbose by option("-v", "--verbose").flag("-s", "--silent", default = false)
+
+  override fun run() {
+    Application.enableConsoleLogs(verbose)
+
+    val app = try {
+      Application()
+    } catch (e: IllegalStateException) {
+      return Timber.error { e.message!! }
+    }
+
+    val extractor = if (file == null) {
+      // We are downloading summaries based on patient IDs
+      app.getAllPatientsExtractor()
+    } else {
+      // We are downloading all patient summaries
+      app.getByPatientIdExtractor(try {
+        parsePatientIdsFile(file!!)
+      } catch (e: NumberFormatException) {
+        return Timber.error { e.message!! }
+      })
+    }
+
+    // Run the extractor tool
+    val tc = TermColors()
+    extractor.getSummaries().blockingSubscribe({ (encounterId, patient, html) ->
+      val (firstName, _, lastName, _, id) = patient
+
+      // Save each file under an easy-to-identify name
+      val fileName = "%s/%04d_%s_%s_%d.html".format(app.outputDir, id, lastName, firstName, encounterId)
+      File(fileName).apply { parentFile.mkdirs() }.writeText(html)
+
+      // Print a message so we know the request succeeded
+      val info = with(tc) { "%s  %-9d %s(%d)".format(green("\u2713"), encounterId, bold(patient.name), id) }
+      Timber.info { info }
+    }, Throwable::printStackTrace)
+  }
+
+  private fun parsePatientIdsFile(file: File): List<Int> {
+    return file.readLines().mapIndexed { i, line ->
+      line.toIntOrNull() ?: throw NumberFormatException(
+          "Parse error: $line (line $i) of ${file.name} is not a number")
+    }
+  }
+}
+
+private fun getJarName(): String? {
+  // https://stackoverflow.com/a/11159435
+  return File(MainCommand::class.java.protectionDomain.codeSource.location.path).name
 }

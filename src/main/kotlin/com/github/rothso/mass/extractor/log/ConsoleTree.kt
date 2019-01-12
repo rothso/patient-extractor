@@ -10,8 +10,10 @@ class ConsoleTree(private val minPriority: Int) : Tree() {
   override fun performLog(priority: Int, tag: String?, throwable: Throwable?, message: String?) {
     if (priority >= minPriority && message != null) {
       println(when (priority) {
+        Timber.ERROR -> tc.red(tc.bold("\u2718 $message"))
         Timber.WARNING -> tc.yellow("\u26A0 $message")
-        else -> tc.gray(message)
+        Timber.VERBOSE -> tc.gray("$message")
+        else -> message
       })
     }
   }
